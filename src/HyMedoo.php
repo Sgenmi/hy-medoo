@@ -26,6 +26,7 @@ class HyMedoo
     private $type = 'mysql';
     protected $prefix = "";
     protected $debug_mode = false;
+    protected $guid = 0;
 
     private function getConnection()
     {
@@ -693,6 +694,9 @@ class HyMedoo
             $table_option = ' ' . $options;
         }
         $sql = $this->exec("CREATE TABLE IF NOT EXISTS $tableName (" . implode(', ', $stack) . ")$table_option");
+        if (!$sql) {
+            return false;
+        }
         return $this->getConnection()->exec($sql);
     }
 
@@ -700,6 +704,9 @@ class HyMedoo
     {
         $tableName = $this->tableQuote($table);
         $sql = $this->exec("DROP TABLE IF EXISTS $tableName");
+        if (!$sql) {
+            return false;
+        }
         return $this->getConnection()->exec($sql);
     }
 
@@ -714,7 +721,7 @@ class HyMedoo
         $this->columnMap($columns, $column_map, true);
         $query = $this->getConnection();
         if ($columns === '*') {
-            return $query->query($query);
+            return $query->query($querySql);
         }
         $res = $query->query($querySql);
         foreach ($res as $v) {
@@ -803,6 +810,9 @@ class HyMedoo
             $fields[] = $this->columnQuote(preg_replace("/(\s*\[JSON\]$)/i", '', $key));
         }
         $sql = $this->exec('INSERT INTO ' . $this->tableQuote($table) . ' (' . implode(', ', $fields) . ') VALUES ' . implode(', ', $stack), $map);
+        if(!$sql){
+            return false;
+        }
         return $this->getConnection()->insert($sql);
     }
 
@@ -876,6 +886,9 @@ class HyMedoo
             $fields[] = $this->columnQuote(preg_replace("/(\s*\[JSON\]$)/i", '', $key));
         }
         $sql = $this->exec('INSERT IGNORE INTO ' . $this->tableQuote($table) . ' (' . implode(', ', $fields) . ') VALUES ' . implode(', ', $stack), $map);
+        if(!$sql){
+            return false;
+        }
         return $this->getConnection()->insert($sql);
     }
 
@@ -930,6 +943,9 @@ class HyMedoo
             }
         }
         $sql = $this->exec('UPDATE ' . $this->tableQuote($table) . ' SET ' . implode(', ', $fields) . $this->whereClause($where, $map), $map);
+        if(!$sql){
+            return false;
+        }
         return $this->getConnection()->execute($sql);
     }
 
@@ -937,6 +953,9 @@ class HyMedoo
     {
         $map = [];
         $sql = $this->exec('DELETE FROM ' . $this->tableQuote($table) . $this->whereClause($where, $map), $map);
+        if(!$sql){
+            return false;
+        }
         return $this->getConnection()->execute($sql);
     }
 
@@ -964,6 +983,9 @@ class HyMedoo
 
         if (!empty($stack)) {
             $sql = $this->exec('UPDATE ' . $this->tableQuote($table) . ' SET ' . implode(', ', $stack) . $this->whereClause($where, $map), $map);
+            if(!$sql){
+                return false;
+            }
             return $this->getConnection()->execute($sql);
         }
 
@@ -985,11 +1007,11 @@ class HyMedoo
             unset($where['LIMIT']);
         }
         $is_single = (is_string($column) && $column !== '*');
-        $querySql = $this->exec($this->selectContext($table, $map, $join, $columns, $where) . ' LIMIT 1', $map);
-        if (!$querySql) {
+        $sql = $this->exec($this->selectContext($table, $map, $join, $columns, $where) . ' LIMIT 1', $map);
+        if (!$sql) {
             return false;
         }
-        $data = $this->getConnection()->query($querySql);
+        $data = $this->getConnection()->query($sql);
 
         if (isset($data[0])) {
             if ($column === '*') {
