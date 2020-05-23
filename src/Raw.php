@@ -12,5 +12,6 @@ namespace Sgenmi\HyMedoo;
 
 class Raw
 {
-
+    public $map;
+    public $value;
 }
