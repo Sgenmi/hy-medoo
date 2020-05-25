@@ -38,21 +38,29 @@ class Medoo
     {
         $raw = $this->raw($query, $map);
         $query = $this->buildRaw($raw, $map);
-        $sql= $this->exec($query, $map);
+        $arr = $this->exec($query, $map);
+        if(!$arr){
+            return false;
+        }
+        list($sql,$map)= $arr;
         return $this->getConnection()->query($sql,$map);
     }
 
     public function exec($query, $map = [])
     {
-        $sql = $this->generate($query, $map);
         $this->guid=0;
         if ($this->debug_mode) {
-
+            $sql = $this->generate($query, $map);
             echo "\n", $sql, "\n";
             $this->debug_mode = false;
             return false;
         }
-        return $sql;
+        //兼容hyperf/DB 中bindValues 方法
+        $_map=[] ;
+        foreach ($map as $k=>$v){
+            $_map[$k] = $v[0];
+        }
+        return [$query,$_map];
     }
 
     protected function generate($query, $map)
@@ -133,7 +141,7 @@ class Medoo
         if (!preg_match('/^[a-zA-Z0-9_]+$/i', $table)) {
             throw new InvalidArgumentException("Incorrect table name \"$table\"");
         }
-        return '"' . $this->prefix . $table . '"';
+        return '`' . $this->prefix . $table . '`';
     }
 
     protected function mapKey()
@@ -167,9 +175,9 @@ class Medoo
             throw new InvalidArgumentException("Incorrect column name \"$string\"");
         }
         if (strpos($string, '.') !== false) {
-            return '"' . $this->prefix . str_replace('.', '"."', $string) . '"';
+            return '`' . $this->prefix . str_replace('.', '`.`', $string) . '`';
         }
-        return '"' . $string . '"';
+        return '`' . $string . '`';
     }
 
     protected function columnPush(&$columns, &$map, $root, $is_join = false)
@@ -697,20 +705,22 @@ class Medoo
         } elseif (is_string($options)) {
             $table_option = ' ' . $options;
         }
-        $sql = $this->exec("CREATE TABLE IF NOT EXISTS $tableName (" . implode(', ', $stack) . ")$table_option");
-        if (!$sql) {
+        $sqlArr = $this->exec("CREATE TABLE IF NOT EXISTS $tableName (" . implode(', ', $stack) . ")$table_option");
+        if (!$sqlArr) {
             return false;
         }
+        list($sql,$map) =$sqlArr;
         return $this->getConnection()->exec($sql);
     }
 
     public function drop($table)
     {
         $tableName = $this->tableQuote($table);
-        $sql = $this->exec("DROP TABLE IF EXISTS $tableName");
-        if (!$sql) {
+        $sqlArr = $this->exec("DROP TABLE IF EXISTS $tableName");
+        if (!$sqlArr) {
             return false;
         }
+        list($sql,$map) =$sqlArr;
         return $this->getConnection()->exec($sql);
     }
 
@@ -721,14 +731,15 @@ class Medoo
         $column_map = [];
         $column = $where === null ? $join : $columns;
         $is_single = (is_string($column) && $column !== '*');
-        $querySql = $this->exec($this->selectContext($table, $map, $join, $columns, $where), $map);
-        $this->columnMap($columns, $column_map, true);
-        $query = $this->getConnection();
-        if ($columns === '*') {
-            return $query->query($querySql);
+        $list = $this->query($this->selectContext($table, $map, $join, $columns, $where), $map);
+        if (!$list) {
+            return $result;
         }
-        $res = $query->query($querySql);
-        foreach ($res as $v) {
+        $this->columnMap($columns, $column_map, true);
+        if ($columns === '*') {
+            return $list;
+        }
+        foreach ($list as $v) {
             $current_stack = [];
             $this->dataMap($v, $columns, $column_map, $current_stack, true, $result);
         }
@@ -813,11 +824,12 @@ class Medoo
         foreach ($columns as $key) {
             $fields[] = $this->columnQuote(preg_replace("/(\s*\[JSON\]$)/i", '', $key));
         }
-        $sql = $this->exec('INSERT INTO ' . $this->tableQuote($table) . ' (' . implode(', ', $fields) . ') VALUES ' . implode(', ', $stack), $map);
-        if(!$sql){
+        $sqlArr = $this->exec('INSERT INTO ' . $this->tableQuote($table) . ' (' . implode(', ', $fields) . ') VALUES ' . implode(', ', $stack), $map);
+        if(!$sqlArr){
             return false;
         }
-        return $this->getConnection()->insert($sql);
+        list($sql,$map)=$sqlArr;
+        return $this->getConnection()->insert($sql,$map);
     }
 
 
@@ -889,11 +901,12 @@ class Medoo
         foreach ($columns as $key) {
             $fields[] = $this->columnQuote(preg_replace("/(\s*\[JSON\]$)/i", '', $key));
         }
-        $sql = $this->exec('INSERT IGNORE INTO ' . $this->tableQuote($table) . ' (' . implode(', ', $fields) . ') VALUES ' . implode(', ', $stack), $map);
-        if(!$sql){
+        $sqlArr = $this->exec('INSERT IGNORE INTO ' . $this->tableQuote($table) . ' (' . implode(', ', $fields) . ') VALUES ' . implode(', ', $stack), $map);
+        if(!$sqlArr){
             return false;
         }
-        return $this->getConnection()->insert($sql);
+        list($sql,$map)=$sqlArr;
+        return $this->getConnection()->insert($sql,$map);
     }
 
     public function update($table, $data, $where = null)
@@ -903,25 +916,19 @@ class Medoo
 
         foreach ($data as $key => $value) {
             $column = $this->columnQuote(preg_replace("/(\s*\[(JSON|\+|\-|\*|\/)\]$)/i", '', $key));
-
             if ($raw = $this->buildRaw($value, $map)) {
                 $fields[] = $column . ' = ' . $raw;
                 continue;
             }
-
             $map_key = $this->mapKey();
-
             preg_match('/(?<column>[a-zA-Z0-9_]+)(\[(?<operator>\+|\-|\*|\/)\])?/i', $key, $match);
-
             if (isset($match['operator'])) {
                 if (is_numeric($value)) {
                     $fields[] = $column . ' = ' . $column . ' ' . $match['operator'] . ' ' . $value;
                 }
             } else {
                 $fields[] = $column . ' = ' . $map_key;
-
                 $type = gettype($value);
-
                 switch ($type) {
                     case 'array':
                         $map[$map_key] = [
@@ -946,21 +953,23 @@ class Medoo
                 }
             }
         }
-        $sql = $this->exec('UPDATE ' . $this->tableQuote($table) . ' SET ' . implode(', ', $fields) . $this->whereClause($where, $map), $map);
-        if(!$sql){
+        $sqlArr = $this->exec('UPDATE ' . $this->tableQuote($table) . ' SET ' . implode(', ', $fields) . $this->whereClause($where, $map), $map);
+        if(!$sqlArr){
             return false;
         }
-        return $this->getConnection()->execute($sql);
+        list($sql,$map)=$sqlArr;
+        return $this->getConnection()->execute($sql,$map);
     }
 
     public function delete($table, $where)
     {
         $map = [];
-        $sql = $this->exec('DELETE FROM ' . $this->tableQuote($table) . $this->whereClause($where, $map), $map);
-        if(!$sql){
+        $sqlArr = $this->exec('DELETE FROM ' . $this->tableQuote($table) . $this->whereClause($where, $map), $map);
+        if(!$sqlArr){
             return false;
         }
-        return $this->getConnection()->execute($sql);
+        list($sql,$map)=$sqlArr;
+        return $this->getConnection()->execute($sql,$map);
     }
 
     public function replace($table, $columns, $where = null)
@@ -968,10 +977,8 @@ class Medoo
         if (!is_array($columns) || empty($columns)) {
             return false;
         }
-
         $map = [];
         $stack = [];
-
         foreach ($columns as $column => $replacements) {
             if (is_array($replacements)) {
                 foreach ($replacements as $old => $new) {
@@ -984,15 +991,14 @@ class Medoo
                 }
             }
         }
-
         if (!empty($stack)) {
-            $sql = $this->exec('UPDATE ' . $this->tableQuote($table) . ' SET ' . implode(', ', $stack) . $this->whereClause($where, $map), $map);
-            if(!$sql){
+            $sqlArr = $this->exec('UPDATE ' . $this->tableQuote($table) . ' SET ' . implode(', ', $stack) . $this->whereClause($where, $map), $map);
+            if(!$sqlArr){
                 return false;
             }
-            return $this->getConnection()->execute($sql);
+            list($sql,$map)=$sqlArr;
+            return $this->getConnection()->execute($sql,$map);
         }
-
         return false;
     }
 
@@ -1015,13 +1021,12 @@ class Medoo
             }
         }
         $is_single = (is_string($column) && $column !== '*');
-        $sql = $this->exec($this->selectContext($table, $map, $join, $columns, $where) . ' LIMIT 1', $map);
-
-        if (!$sql) {
-            return false;
+        $sqlArr = $this->exec($this->selectContext($table, $map, $join, $columns, $where) . ' LIMIT 1', $map);
+        if(!$sqlArr){
+            return $result;
         }
-        $data = $this->getConnection()->query($sql);
-
+        list($sql,$map)=$sqlArr;
+        $data = $this->getConnection()->query($sql,$map);
         if (isset($data[0])) {
             if ($column === '*') {
                 return $data[0];
@@ -1041,12 +1046,13 @@ class Medoo
     {
         $map = [];
         $column = null;
-        $sql = $this->exec('SELECT EXISTS(' . $this->selectContext($table, $map, $join, $column, $where, 1) . ')', $map);
-        if (!$sql) {
+        $sqlArr = $this->exec('SELECT EXISTS(' . $this->selectContext($table, $map, $join, $column, $where, 1) . ')', $map);
+        if(!$sqlArr){
             return false;
         }
+        list($sql,$map)=$sqlArr;
         $result = 0;
-        $res = $this->getConnection()->fetch($sql);
+        $res = $this->getConnection()->fetch($sql,$map);
         if ($res) {
             $result = $res['c'];
         }
@@ -1086,12 +1092,13 @@ class Medoo
     private function aggregate($type, $table, $join = null, $column = null, $where = null)
     {
         $map = [];
-        $sql = $this->exec($this->selectContext($table, $map, $join, $column, $where, strtoupper($type)), $map);
+        $sqlArr = $this->exec($this->selectContext($table, $map, $join, $column, $where, strtoupper($type)), $map);
 
-        if (!$sql) {
+        if(!$sqlArr){
             return false;
         }
-        $res = $this->getConnection()->fetch($sql);
+        list($sql,$map)=$sqlArr;
+        $res = $this->getConnection()->fetch($sql,$map);
         $number = 0;
         foreach ($res as $v) {
             $number = $v;
