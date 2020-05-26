@@ -58,7 +58,7 @@ class Medoo
         //兼容hyperf/DB 中bindValues 方法
         $_map=[] ;
         foreach ($map as $k=>$v){
-            $_map[$k] = $v[0];
+            $_map[$k] = is_array($v[0]) ?$v[0][0] : $v[0];
         }
         return [$query,$_map];
     }
@@ -158,7 +158,8 @@ class Medoo
             'boolean' => PDO::PARAM_BOOL,
             'string' => PDO::PARAM_STR,
             'object' => PDO::PARAM_STR,
-            'resource' => PDO::PARAM_LOB
+            'resource' => PDO::PARAM_LOB,
+            'array' => PDO::PARAM_STR
         ];
 
         if ($type === 'boolean') {
@@ -166,6 +167,10 @@ class Medoo
         } elseif ($type === 'NULL') {
             $value = null;
         }
+//        var_dump($value);
+//        var_dump($type);
+//        var_dump($map);
+
         return [$value, $map[$type]];
     }
 
