@@ -8,7 +8,7 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "hyperf/db": "^1.1"
+        "hyperf/db": "^2.0"
     },
     "autoload": {
         "psr-4": {
