@@ -1,0 +1,18 @@
+{
+    "name": "sgenmi/hy-medoo",
+    "authors": [
+        {
+            "name": "史海",
+            "email": "sgenmi@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "hyperf/db": "^1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Sgenmi\\HyMedoo\\": "src/"
+        }
+    }
+}
