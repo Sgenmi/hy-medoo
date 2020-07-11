@@ -133,6 +133,9 @@ class Medoo
 
     public function quote($string)
     {
+        if(is_array($string)){
+            $string = (string) $string[0];
+        }
         return $this->getConnection()->quote($string);
     }
 
