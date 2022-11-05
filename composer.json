@@ -8,7 +8,9 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "hyperf/db": "^1.1"
+        "php": ">=8.0",
+        "hyperf/db": "v3.0.0-rc.13",
+        "catfan/medoo": "^2.1"
     },
     "autoload": {
         "psr-4": {
