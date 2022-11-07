@@ -13,9 +13,9 @@ composer require sgenmi/hy-medoo
 
 namespace App\Model;
 
-use Sgenmi\HyMedoo\HyMedoo;
+use Sgenmi\HyMedoo\AbstractModel;
 
-class AdminModel extends HyMedoo
+class AdminModel extends AbstractModel
 {
     protected string $table = 'admin';
 

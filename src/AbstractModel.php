@@ -60,7 +60,7 @@ use Medoo\Raw;
  * @method array info();
  *
  */
-abstract class Model
+abstract class AbstractModel
 {
     protected string $table = '';
 
