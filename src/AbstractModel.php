@@ -86,7 +86,7 @@ abstract class AbstractModel
      */
     public function last(): string
     {
-        return  strval(Context::get(static::class.":model:lastSql",''));
+        return  strval(Context::get(self::getUnionKey('model:lastSql'),''));
     }
 
     private static function call(string $name, array $arguments)
