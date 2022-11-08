@@ -31,14 +31,7 @@ class AdminModel extends AbstractModel
 <?php
 
 declare(strict_types=1);
-/**
- * This file is part of Hyperf.
- *
- * @link     https://www.hyperf.io
- * @document https://hyperf.wiki
- * @contact  group@hyperf.io
- * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
- */
+
 namespace App\Controller;
 
 use App\Model\AdminModel;
@@ -61,3 +54,15 @@ class IndexController extends AbstractController
 
 ```
 
+
+# 数据模型：Model
+
+```php
+ //注： 采⽤开源medoo作为框架的model，兼容medoo语法
+       不需要写表名，已进行二次封装，表名会自动带入
+```
+## Medoo 文档
+
+官网文档： [https://medoo.in/](https://medoo.in/)
+
+特别感谢Medoo作者，开源这么小巧 好用的类库 
