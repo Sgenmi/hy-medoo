@@ -60,7 +60,7 @@ use Medoo\Raw;
  * @method array info();
  *
  */
-abstract class Model
+abstract class AbstractModel
 {
     protected string $table = '';
 
@@ -86,7 +86,7 @@ abstract class Model
      */
     public function last(): string
     {
-        return  strval(Context::get(static::class.":model:lastSql",''));
+        return  strval(Context::get(self::getUnionKey('model:lastSql'),''));
     }
 
     private static function call(string $name, array $arguments)
