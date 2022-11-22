@@ -23,37 +23,38 @@ use Medoo\Raw;
  * @method delete(array|Raw $where)
  * @method replace(array $columns, array $where=null)
  *
- * @method array select( array $columns, array $where=null)
- * @method array select( array $join,array $columns, array $where=null)
- * @method null select(array $columns, callable $callback)
- * @method null select(array $columns, array $where, callable $callback)
- * @method null select(array $join, array $columns, array $where, callable $callback)
+ * @method array select(array|string $columns, array $where=null)
+ * @method array select(array $join,array $columns=[], array $where=null)
+ * @method null select(array $columns, callable $callback=null)
+ * @method null select(array $join, array $columns, array $where=null, callable $callback=null)
+ * @method null select(array|string $columns, array $where=null, callable $callback=null)
  *
  * @method mixed get(array|string $columns, array $where=null)
- * @method mixed get(array $join, array|string $columns, array $where)
+ * @method mixed get(array $join, array|string $columns, array $where=null)
+
  *
  * @method void action(callable $actions )
  *
  * @method bool has(array $where)
- * @method bool has(array $join, array $where)
+ * @method bool has(array $join, array $wher=null)
  *
  * @method mixed rand(array|string $column, array $where=null)
  * @method mixed rand(array $join,array|string $column, array $where)
  *
  * @method int count(string $column, array $where=null)
- * @method int count(array $join, string $column, array $where)
+ * @method int count(array $join, string $column, array $where=null)
  *
  * @method string max(string $column,array $where=null)
- * @method string max(array $join,string $column,array $where)
+ * @method string max(array $join,string $column,array $where=null)
  *
  * @method string min(string $column,array $where=null)
- * @method string min(array $join,string $column, array $where)
+ * @method string min(array $join,string $column, array $where=null)
  *
  * @method string avg(string $column,array $where=null)
- * @method string avg(array $join,string $column,array $where)
+ * @method string avg(array $join,string $column,array $where=null)
  *
  * @method string sum(string $column,array $where=null)
- * @method string sum(array $join,string $column,array $where)
+ * @method string sum(array $join,string $column,array $where=null)
  *
  * @method mixed debug();
  * @method array log();
