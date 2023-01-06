@@ -9,7 +9,7 @@
     "minimum-stability": "dev",
     "require": {
         "php": ">=8.0",
-        "hyperf/db": "v3.0.0-rc.13",
+        "hyperf/db": "^3.0",
         "catfan/medoo": "^2.1"
     },
     "autoload": {
