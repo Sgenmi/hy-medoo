@@ -16,6 +16,8 @@ use Hyperf\DB\DB;
 use Hyperf\Utils\ApplicationContext;
 use Medoo\Medoo;
 use Medoo\Raw;
+use PDOStatement;
+
 
 /**
  * @method insert(array $values)
@@ -59,11 +61,16 @@ use Medoo\Raw;
  * @method mixed debug();
  * @method array log();
  * @method array info();
+ * @method Medoo lock(string $lock='FOR UPDATE')
  *
  */
 abstract class AbstractModel
 {
     protected string $table = '';
+
+    const LOCK_FOR_UPDATE = 'FOR UPDATE';
+    const LOCK_SHARE = 'LOCK IN SHARE MODE';
+
 
     public function __call(string $name, array $arguments)
     {
@@ -94,30 +101,66 @@ abstract class AbstractModel
     {
         $unionDebugKey = self::getUnionKey('model:debug');
         $unionLastSqlKey = self::getUnionKey('model:lastSql');
+        $unionLockSqlKey = self::getUnionKey('model:lock');
 
         $cls = ApplicationContext::getContainer()->get(static::class);
         if($name=='debug'){
             Context::set($unionDebugKey,true);
             return $cls;
         }
+
+        if($name=='lock'){
+            Context::set($unionLockSqlKey,$arguments[0]??self::LOCK_FOR_UPDATE);
+            return $cls;
+        }
         $table = $cls->getTable();
         //debug() mode
         $debug = Context::get($unionDebugKey);
+        //取出lock后 立即设置为空
+        $lockStr = Context::get($unionLockSqlKey,'');
+        Context::set($unionLockSqlKey,'');
 
         $res =  ApplicationContext::getContainer()->get(DB::class)->run(
-            function (\PDO $pdo) use ($name, $arguments, $table,$debug,$unionLastSqlKey) {
+            function (\PDO $pdo) use ($name, $arguments, $table,$debug,$unionLastSqlKey,$lockStr) {
                 $options = [
                     'database_type' => 'mysql',
                 ];
                 $ret = null;
                 $options['pdo'] = $pdo;
-                $medoo = new Medoo($options);
+                $medoo = new class($options) extends Medoo{
+                    private string $lock='';
+
+                    /**
+                     * @param string $type
+                     * @author Sgenmi
+                     */
+                    public function lock(string $type= AbstractModel::LOCK_FOR_UPDATE):self{
+                        $this->lock = $type;
+                        return $this;
+                    }
+
+                    /**
+                     * @param string $statement
+                     * @param array $map
+                     * @param callable|null $callback
+                     * @return PDOStatement|null
+                     * @author Sgenmi
+                     */
+                    public function exec(string $statement, array $map = [], callable $callback = null): ?PDOStatement
+                    {
+                        $statement = $statement.' '. trim($this->lock);
+                        $this->lock='';
+                        $res =  parent::exec($statement,$map,$callback);
+                        return $res;
+                    }
+                };
+
                 array_unshift($arguments, $table);
                 //debug 返回medoo debug()方式
                 if($debug ){
-                    return $medoo->debug()->{$name}(...$arguments);
+                    return $medoo->debug()->lock($lockStr)->{$name}(...$arguments);
                 }
-
+                $medoo = $medoo->lock($lockStr);
                 switch ($name){
                     case 'insert':
                         $stm = $medoo->{$name}(...$arguments);
