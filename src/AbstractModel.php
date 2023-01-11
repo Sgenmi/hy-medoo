@@ -62,6 +62,7 @@ use PDOStatement;
  * @method array log();
  * @method array info();
  * @method Medoo lock(string $lock='FOR UPDATE')
+ * @method Medoo forceIndex(string $index)
  *
  */
 abstract class AbstractModel
@@ -102,26 +103,36 @@ abstract class AbstractModel
         $unionDebugKey = self::getUnionKey('model:debug');
         $unionLastSqlKey = self::getUnionKey('model:lastSql');
         $unionLockSqlKey = self::getUnionKey('model:lock');
+        $unionforceIndexSqlKey = self::getUnionKey('model:forceIndex');
 
         $cls = ApplicationContext::getContainer()->get(static::class);
         if($name=='debug'){
             Context::set($unionDebugKey,true);
             return $cls;
         }
-
         if($name=='lock'){
             Context::set($unionLockSqlKey,$arguments[0]??self::LOCK_FOR_UPDATE);
             return $cls;
         }
+
+        if($name=='forceIndex'){
+            Context::set($unionforceIndexSqlKey,$arguments[0]??'');
+            return $cls;
+        }
+
         $table = $cls->getTable();
         //debug() mode
         $debug = Context::get($unionDebugKey);
+
         //取出lock后 立即设置为空
         $lockStr = Context::get($unionLockSqlKey,'');
         Context::set($unionLockSqlKey,'');
+        //强制索引
+        $forceIndex = Context::get($unionforceIndexSqlKey,'');
+        Context::set($unionforceIndexSqlKey,'');
 
         $res =  ApplicationContext::getContainer()->get(DB::class)->run(
-            function (\PDO $pdo) use ($name, $arguments, $table,$debug,$unionLastSqlKey,$lockStr) {
+            function (\PDO $pdo) use ($name, $arguments, $table,$debug,$unionLastSqlKey,$lockStr,$forceIndex) {
                 $options = [
                     'database_type' => 'mysql',
                 ];
@@ -129,13 +140,22 @@ abstract class AbstractModel
                 $options['pdo'] = $pdo;
                 $medoo = new class($options) extends Medoo{
                     private string $lock='';
-
+                    private string $forceIndex='';
                     /**
                      * @param string $type
                      * @author Sgenmi
                      */
                     public function lock(string $type= AbstractModel::LOCK_FOR_UPDATE):self{
                         $this->lock = $type;
+                        return $this;
+                    }
+
+                    /**
+                     * @param string $index
+                     * @author Sgenmi
+                     */
+                    public function forceIndex(string $index):self {
+                        $this->forceIndex = $index;
                         return $this;
                     }
 
@@ -148,19 +168,34 @@ abstract class AbstractModel
                      */
                     public function exec(string $statement, array $map = [], callable $callback = null): ?PDOStatement
                     {
+                        if($this->forceIndex && str_starts_with($statement,'SELECT')){
+                            if(str_contains($statement,'JOIN')){
+                                preg_match("/FROM \"(.*?)\"\s*JOIN/is",$statement, $m);
+                                $table = $m[1]??'';
+                                $mathStr = 'JOIN';
+                            }else{
+                                preg_match("/FROM \"(.*?)\"\s*WHERE/is",$statement, $m);
+                                $table = $m[1]??'';
+                                $mathStr = 'WHERE';
+                            }
+                            if($table){
+                                $_str = sprintf('FROM "%s" %s',$table,$mathStr);
+                                $statement = str_replace($_str, sprintf('FROM "%s" FORCE INDEX(%s) %s',$table,$this->forceIndex,$mathStr)  ,$statement);
+                            }
+                        }
                         $statement = $statement.' '. trim($this->lock);
                         $this->lock='';
-                        $res =  parent::exec($statement,$map,$callback);
-                        return $res;
+                        $this->forceIndex='';
+                        return parent::exec($statement,$map,$callback);
                     }
                 };
-
                 array_unshift($arguments, $table);
+
+                $medoo = $medoo->lock($lockStr)->forceIndex($forceIndex);
                 //debug 返回medoo debug()方式
                 if($debug ){
                     return $medoo->debug()->lock($lockStr)->{$name}(...$arguments);
                 }
-                $medoo = $medoo->lock($lockStr);
                 switch ($name){
                     case 'insert':
                         $stm = $medoo->{$name}(...$arguments);
